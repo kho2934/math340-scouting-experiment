@@ -8,23 +8,45 @@ execute:
   warning: false
 ---
 
-## Quarto
+## Section 1: Experiment Setup
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+A football scout starts the scouting process with a collection of prospects and decides whether to evaluate more. The experiment models the process with two draws from a deck of cards. Each card represents a player, and each ace will be equivalent to a standout prospect. After the first draw, I set the cards I drew aside and take the second draw from the remaining deck. An ace earns one point if it appears in the first group and two points if it appears in the second, because the second round represents a closer evaluation. My question is whether drawing more cards in the second round after finding aces in the first makes it more likely to score at least five points.
 
-## Running Code
+I use a standard 52-card deck with four aces, a coin with heads probability $2/3$, and a four-sided die with probabilities $1/10,2/10,3/10,4/10$ for outcomes $1,2,3,4$, respectively. The shuffle, coin flip, and die roll are independent.
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+1. Shuffle the deck, flip the coin, and roll the die. Let $C=1$ for heads and $C=0$ for tails, and let $D$ be the die result.
+2. Draw $N=2D$ cards. Let $A$ count the aces in this first hand.
+3. Draw $M=2+2C+2A$ cards from the remaining deck. Let $B$ count the aces in this second hand.
+4. Record the score $X=A+2B$. Start the next trial with a full deck.
 
-```{r}
-1 + 1
-```
+I record each outcome as $(c,d,a,b)$, where $c\in\{0,1\}$, $d\in\{1,2,3,4\}$, $0\le a\le\min(4,2d)$, and $0\le b\le\min(4-a,2+2c+2a)$. For example, $(0,2,1,2)$ means tails, four first-pass cards containing one ace, and two second-pass aces. Its score is $1+2(2)=5$.
 
-You can add options to executable code like this
+Since there are only four aces, $A+B\le4$, so $X\le8$. With heads and $D=2$, a first hand with no aces allows $B=0,\ldots,4$, giving the even scores. A first hand with one ace allows $B=0,\ldots,3$, giving the odd scores. Thus the support of $X$ is $\{0,1,\ldots,8\}$.
 
-```{r}
-#| echo: false
-2 * 2
-```
+## Section 2: Derivations
+Given $D=d$, the first hand has $n=2d$ cards. To get exactly $a$ aces, choose $a$ of the four aces and $n-a$ of the 48 non-aces:
 
-The `echo: false` option disables the printing of code (only output is displayed).
+$$
+h_d(a)=P(A=a\mid D=d)
+=\frac{\binom4a\binom{48}{n-a}}{\binom{52}{n}}.
+$$
+
+After that hand, there are $4-a$ aces and $48-n+a$ non-aces left. With $m=2+2c+2a$, the second-hand probability is
+
+$$
+g_{c,d,a}(b)=P(B=b\mid C=c,D=d,A=a)
+=\frac{\binom{4-a}{b}\binom{48-n+a}{m-b}}
+{\binom{52-n}{m}}.
+$$
+
+Let $w_0=1/3$ and $w_1=2/3$. By the multiplication rule, a path $(c,d,a,b)$ has probability $w_c(d/10)h_d(a)g_{c,d,a}(b)$. To get $P(X=x)$, add the probabilities of every path with $a+2b=x$.
+
+Since \(X=2(A+B)-A\) and there are only four aces, a score of eight requires \(A=0\) and \(B=4\). The adaptive rule needs heads to draw four cards in the second pass at $A=0$. In the situation of a blank first hand, all four aces are contained in exactly one of the possible four-card second hands. Therefore,
+
+$$
+P(X=8)=\frac23\sum_{d=1}^4
+\frac d{10}
+\frac{\binom{48}{2d}}{\binom{52}{2d}}
+\frac1{\binom{52-2d}{4}}.
+$$
+

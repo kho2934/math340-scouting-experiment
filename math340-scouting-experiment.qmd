@@ -137,11 +137,10 @@ $$
 E(X)=\sum_{x=0}^8 xP(X=x),\qquad
 \operatorname{Var}(X)=\sum_{x=0}^8 x^2P(X=x)-[E(X)]^2.
 $$
+
 ## Section 3: Simulation
 
 I simulate 100,000 independent trials. Cards 1 through 4 represent aces, and a random permutation represents the shuffled deck. The second pass starts immediately after the actual first hand.
-
-For comparison, the reference rule draws an independent first-hand ace count $A^*$ and sets its budget to $2+2C+2A^*$. Given the coin and die outcomes, $A^*$ has the same distribution as $A$, so the rules have the same distribution of second-pass draw sizes. Both rules draw from the deck left by the actual first hand.
 
 ```{r}
 #| label: simulate-adaptive
@@ -180,3 +179,55 @@ round(c(
 ), 6)
 ```
 It is expected for exact and simulated values to be close, the simulated values will vary since its originate frm a finite number of trials. A score of eight is so rare that seeing no eights in 100,000 trials would still be consistent with the exact calculation.
+
+### Comparing the adaptive and reference rules
+
+I did a comparison between the adaptive rule and a reference rule that uses a separate ace count in order to set the size of the second hand. If the die produces a first hand of six cards, for example, I generate the reference count from a separate six-card hand. I use that separate ace count, along with the coin result, to decide how many cards to draw next. The second hand still comes from the cards left by the actual first hand. Given the coin and die results, both rules have the same distribution of second-hand sizes.
+
+```{r}
+#| label: reference-simulation
+
+one_reference_trial <- function() {
+  coin_flip <- rbinom(1, size = 1, prob = coin[2])
+  die_roll <- sample.int(4, size = 1, prob = die)
+  n <- 2 * die_roll
+  deck <- sample.int(52)
+
+  # The actual first hand determines the score and the remaining deck.
+  a <- sum(deck[seq_len(n)] <= 4)
+
+  # A separate hand sets the draw size only.
+  a_ref <- sum(sample.int(52, size = n) <= 4)
+  m_ref <- 2 + 2 * coin_flip + 2 * a_ref
+  b_ref <- sum(deck[n + seq_len(m_ref)] <= 4)
+
+  a + 2 * b_ref
+}
+
+set.seed(3402027)
+ref_observed <- replicate(trials, one_reference_trial())
+
+ref_paths <- exact_paths(adaptive = FALSE)
+ref_pmf <- pmf_from_paths(ref_paths)
+
+stopifnot(abs(sum(ref_pmf) - 1) < 1e-12)
+
+# Check that both rules use the same expected number of cards.
+expected_draws <- function(z) sum((z$n + z$m) * z$p)
+stopifnot(abs(expected_draws(paths) - expected_draws(ref_paths)) < 1e-12)
+
+comparison <- data.frame(
+  Rule = c("Adaptive", "Reference"),
+  `Exact mean` = c(mu, sum(scores * ref_pmf)),
+  `Simulated mean` = c(mean(observed), mean(ref_observed)),
+  `Exact 5+ (%)` = 100 * c(sum(pmf[scores >= 5]),
+                          sum(ref_pmf[scores >= 5])),
+  `Simulated 5+ (%)` = 100 * c(mean(observed >= 5),
+                              mean(ref_observed >= 5)),
+  check.names = FALSE
+)
+
+knitr::kable(comparison, digits = 5, format.args = list(nsmall = 5))
+```
+
+There is a higher chance of reaching 5 for the adaptive rule, even if the reference rule has a higher average score. This made me wonder whether the adaptive rule would also do better at other score targets.

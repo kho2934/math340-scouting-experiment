@@ -137,3 +137,46 @@ $$
 E(X)=\sum_{x=0}^8 xP(X=x),\qquad
 \operatorname{Var}(X)=\sum_{x=0}^8 x^2P(X=x)-[E(X)]^2.
 $$
+## Section 3: Simulation
+
+I simulate 100,000 independent trials. Cards 1 through 4 represent aces, and a random permutation represents the shuffled deck. The second pass starts immediately after the actual first hand.
+
+For comparison, the reference rule draws an independent first-hand ace count $A^*$ and sets its budget to $2+2C+2A^*$. Given the coin and die outcomes, $A^*$ has the same distribution as $A$, so the rules have the same distribution of second-pass draw sizes. Both rules draw from the deck left by the actual first hand.
+
+```{r}
+#| label: simulate-adaptive
+
+one_trial <- function() {
+  coin_flip <- rbinom(1, size = 1, prob = coin[2])
+  die_roll <- sample.int(4, size = 1, prob = die)
+  n <- 2 * die_roll
+  deck <- sample.int(52)
+
+  a <- sum(deck[seq_len(n)] <= 4)
+  m <- 2 + 2 * coin_flip + 2 * a
+  b <- sum(deck[n + seq_len(m)] <= 4)
+
+  a + 2 * b
+}
+
+set.seed(3402026)
+trials <- 100000L
+observed <- replicate(trials, one_trial())
+
+# Add 1 because tabulate starts at bin 1, but scores start at 0.
+sim_pmf <- tabulate(observed + 1L, nbins = length(scores)) / trials
+
+knitr::kable(data.frame(
+  Score = scores,
+  Exact = pmf,
+  Simulated = sim_pmf
+), digits = 8)
+
+round(c(
+  exact_mean = mu,
+  simulated_mean = mean(observed),
+  exact_probability_5_or_more = sum(pmf[scores >= 5]),
+  simulated_probability_5_or_more = mean(observed >= 5)
+), 6)
+```
+It is expected for exact and simulated values to be close, the simulated values will vary since its originate frm a finite number of trials. A score of eight is so rare that seeing no eights in 100,000 trials would still be consistent with the exact calculation.

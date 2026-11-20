@@ -364,3 +364,54 @@ knitr::kable(
   format.args = list(nsmall = 5)
 )
 ```
+
+### Comparing different score targets
+
+I compare the probability of reaching each target from one through eight. For a target of five, for example, I add the probabilities of scores five, six, seven, and eight. For either rule,
+
+$$
+P(X\ge k)=\sum_{x=k}^{8}P(X=x).
+$$
+
+```{r}
+#| label: threshold-comparison
+
+targets <- 1:8
+
+tail_prob <- function(p) {
+  vapply(targets, function(k) sum(p[scores >= k]), numeric(1))
+}
+
+adaptive_tail <- tail_prob(pmf)
+reference_tail <- tail_prob(ref_pmf)
+gap <- adaptive_tail - reference_tail
+
+# For a nonnegative integer score, its mean equals the sum of its
+# probabilities of reaching each positive integer target.
+mean_gap <- sum(scores * pmf) - sum(scores * ref_pmf)
+stopifnot(abs(sum(gap) - mean_gap) < 1e-12)
+
+winner <- ifelse(
+  abs(gap) < 1e-12,
+  "Tie",
+  ifelse(gap > 0, "Adaptive", "Reference")
+)
+
+threshold_table <- data.frame(
+  Target = as.character(targets),
+  `Adaptive (%)` = 100 * adaptive_tail,
+  `Reference (%)` = 100 * reference_tail,
+  `Gap (percentage points)` = 100 * gap,
+  `Higher probability` = winner,
+  check.names = FALSE
+)
+
+knitr::kable(
+  threshold_table,
+  digits = 4,
+  format.args = list(nsmall = 4),
+  align = "rrrrl"
+)
+```
+
+The gap is the adaptive probability minus the reference probability, in percentage points. A positive gap favors the adaptive rule, and a negative gap favors the reference rule.

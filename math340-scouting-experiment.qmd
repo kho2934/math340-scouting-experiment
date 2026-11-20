@@ -305,4 +305,62 @@ barplot(
   args.legend = list(x = "topright", bty = "n")
 )
 ```
+### Comparing the adaptive and reference rules
 
+I compare the adaptive rule with a reference rule that uses a separate ace count to set the size of the second hand. In the event that a die gave a first hand of six cards, I generate the reference count from a separate six-card hand. Then the separate ace count, and the coin result will be used to decide how many cards to draw next. The second hand still comes from the cards left by the actual first hand. Given the coin and die results, both rules have the same distribution of second-hand sizes.
+
+```{r}
+#| label: reference-simulation
+
+one_reference_trial <- function() {
+  coin_flip <- rbinom(1, size = 1, prob = coin[2])
+  die_roll <- sample.int(4, size = 1, prob = die)
+  n <- 2 * die_roll
+  deck <- sample.int(52)
+
+  # The actual first hand determines the score and remaining deck.
+  a <- sum(deck[seq_len(n)] <= 4)
+
+  # This independent hand sets the reference budget only.
+  a_ref <- sum(sample.int(52, size = n) <= 4)
+  m_ref <- 2 + 2 * coin_flip + 2 * a_ref
+  b_ref <- sum(deck[n + seq_len(m_ref)] <= 4)
+
+  a + 2 * b_ref
+}
+
+set.seed(3402027)
+ref_observed <- replicate(trials, one_reference_trial())
+
+# Calculate the exact reference distribution using the Section 2 function.
+ref_paths <- exact_paths(adaptive = FALSE)
+ref_pmf <- pmf_from_paths(ref_paths)
+stopifnot(abs(sum(ref_pmf) - 1) < 1e-12)
+
+# Check that both rules use the same expected total number of cards.
+expected_draws <- function(z) sum((z$n + z$m) * z$p)
+stopifnot(
+  abs(expected_draws(paths) - expected_draws(ref_paths)) < 1e-12
+)
+
+comparison <- data.frame(
+  Rule = c("Adaptive", "Reference"),
+  `Exact mean` = c(mu, sum(scores * ref_pmf)),
+  `Simulated mean` = c(mean(observed), mean(ref_observed)),
+  `Exact 5+ (%)` = 100 * c(
+    sum(pmf[scores >= 5]),
+    sum(ref_pmf[scores >= 5])
+  ),
+  `Simulated 5+ (%)` = 100 * c(
+    mean(observed >= 5),
+    mean(ref_observed >= 5)
+  ),
+  check.names = FALSE
+)
+
+knitr::kable(
+  comparison,
+  digits = 5,
+  format.args = list(nsmall = 5)
+)
+```

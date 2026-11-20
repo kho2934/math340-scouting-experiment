@@ -178,7 +178,6 @@ round(c(
   simulated_probability_5_or_more = mean(observed >= 5)
 ), 6)
 ```
-It is expected for exact and simulated values to be close, the simulated values will vary since its originate frm a finite number of trials. A score of eight is so rare that seeing no eights in 100,000 trials would still be consistent with the exact calculation.
 
 ### Comparing the adaptive and reference rules
 
@@ -231,3 +230,79 @@ knitr::kable(comparison, digits = 5, format.args = list(nsmall = 5))
 ```
 
 There is a higher chance of reaching 5 for the adaptive rule, even if the reference rule has a higher average score. This made me wonder whether the adaptive rule would also do better at other score targets.
+
+## Section 3: Simulation
+
+I run 100,000 independent trials in order to compare the observed scores with the exact probabilities. Aces are represented by cards 1 through 4, and a random permutation represents the shuffled deck.In each trial, I use the first hand’s ace count and the coin result to determine the second-hand size. The second hand comes from the remaining cards, so no card is drawn twice.
+
+```{r}
+#| label: simulate-adaptive
+
+one_trial <- function() {
+  coin_flip <- rbinom(1, size = 1, prob = coin[2])
+  die_roll <- sample.int(4, size = 1, prob = die)
+  n <- 2 * die_roll
+
+  # Shuffle all 52 cards; cards 1 through 4 are aces.
+  deck <- sample.int(52)
+  a <- sum(deck[seq_len(n)] <= 4)
+
+  m <- 2 + 2 * coin_flip + 2 * a
+
+  # Start after the first n cards to avoid drawing any card twice.
+  b <- sum(deck[n + seq_len(m)] <= 4)
+
+  a + 2 * b
+}
+
+set.seed(3402026)
+trials <- 100000L
+observed <- replicate(trials, one_trial())
+
+# Add 1 because tabulate starts at bin 1, while scores start at 0.
+sim_pmf <- tabulate(observed + 1L, nbins = length(scores)) / trials
+
+stopifnot(
+  all(observed %in% scores),
+  abs(sum(sim_pmf) - 1) < 1e-12
+)
+
+knitr::kable(data.frame(
+  Score = scores,
+  Exact = pmf,
+  Simulated = sim_pmf
+), digits = 8)
+```
+
+```{r}
+#| label: simulation-summary
+
+summary_table <- data.frame(
+  Quantity = c("Mean score", "Variance", "Probability of scoring at least five"),
+  Exact = c(mu, sigma2, sum(pmf[scores >= 5])),
+  Simulated = c(mean(observed), var(observed), mean(observed >= 5))
+)
+
+knitr::kable(
+  summary_table,
+  digits = 6,
+  format.args = list(nsmall = 6)
+)
+```
+
+```{r}
+#| label: fig-score-comparison
+#| fig-cap: "Exact and simulated probabilities for the adaptive scouting score."
+
+barplot(
+  rbind(pmf, sim_pmf),
+  beside = TRUE,
+  names.arg = scores,
+  col = c("yellow", "red"),
+  xlab = "Scouting score",
+  ylab = "Probability",
+  legend.text = c("Exact", "Simulated"),
+  args.legend = list(x = "topright", bty = "n")
+)
+```
+
